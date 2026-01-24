@@ -1,0 +1,70 @@
+default_model: gpt
+
+providers:
+  FREE:
+    api_key_env: FREE_KEY
+    base_url: https://lastxianyi.zeabur.app/v1
+  CHAT:
+    api_key_env: CHAT_KEY
+    base_url: https://api.chatanywhere.org/v1
+  GEMINI:
+    api_key_env: GEMINI_KEY
+    base_url: https://generativelanguage.googleapis.com/v1beta/openai/
+  ST:
+    api_key_env: ST_KEY
+    base_url: https://spark-api-open.xf-yun.com/v1
+  DASHSCOPE:
+    api_key_env: DASHSCOPE_KEY
+    base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+  IFLOW:
+    api_key_env: IFLOW_KEY
+    base_url: https://apis.iflow.cn/v1
+
+models:
+  gpt-oss:
+    provider: FREE
+    model: openai/gpt-oss-120b
+    match: ["default", "gpt-oss"]
+  qwen-flash:
+    provider: DASHSCOPE
+    model: qwen-flash
+
+  spark:
+    provider: ST
+    model: lite
+    match: ["st", "spark"]
+
+  gemini:
+    provider: GEMINI
+    model: gemini-2.5-flash
+    match: ["gemini", "google"]
+
+  kimi:
+    provider: FREE
+    model: moonshotai/Kimi-K2-Instruct
+    match: ["kimi", "moonshot"]
+
+  qwen:
+    provider: FREE
+    model: tongyi-qwen3-max-model
+    match: ["qwen"]
+  
+  glm:
+    provider: FREE
+    model: zai-org/GLM-4.5
+    match: ["glm"]
+
+  gpt:
+    provider: CHAT
+    model: gpt-5-mini
+    match: ["gpt", "chatgpt"]
+
+  gpt-4o-mini:
+    provider: CHAT
+    model: gpt-4o-mini
+    match: ["gpt-4o-mini"]
+
+  deepseek:
+    provider: CHAT
+    model: deepseek-v3
+    match: ["deepseek", "ds"]
