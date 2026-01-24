@@ -1,7 +1,8 @@
 # AI Infra Package
 
 from .ai_infra import (
-    chat_completion,
+    _chat_completion,
+	chat_completion,
     init_genai_client,
     interact_with_pdf,
     init_ai_config,
@@ -10,6 +11,7 @@ from .ai_infra import (
 )
 
 __all__ = [
+	"_chat_completion",
 	"chat_completion",
 	"init_genai_client",
 	"interact_with_pdf",	

@@ -8,6 +8,7 @@ import json
 import yaml
 import hashlib
 import os
+import warnings
 from typing import Dict, Any, List, Optional, Union
 from dataclasses import dataclass, field
 from abc import ABC, abstractmethod
@@ -50,7 +51,7 @@ logger = logging.getLogger(__name__)
 # 融合的用户提供的AI功能函数
 # ================================
 
-async def chat_completion(question: str, model: str, base_url: str, api_key: str, system_instr: str | None = None) -> str:
+async def _chat_completion(question: str, model: str, base_url: str, api_key: str, system_instr: str | None = None, streaming: bool = False):
     '''
     AI interaction function using OpenAI SDK.
     Parameters
@@ -63,15 +64,16 @@ async def chat_completion(question: str, model: str, base_url: str, api_key: str
         The base URL of the AI service API.
     api_key : str
         API key for authentication.
-
     system_instr : str, optional
         System instruction for the AI model, by default None.
+    streaming : bool, optional
+        Whether to return streaming response, by default False.
     '''
     if not OPENAI_AVAILABLE:
         raise ImportError("OpenAI SDK not available. Install with: pip install openai")
 
-    # 在线程池中运行同步的OpenAI调用，使其成为真正的异步函数
-    def _sync_call():
+    if streaming:
+        # 流式响应模式
         client = OpenAI(api_key=api_key, base_url=base_url)
         
         # 尝试 1: 标准方式，使用 system role
@@ -83,9 +85,21 @@ async def chat_completion(question: str, model: str, base_url: str, api_key: str
             
             response = client.chat.completions.create(
                 model=model,
-                messages=messages # type: ignore
+                messages=messages, # type: ignore
+                stream=True
             )
-            return response.choices[0].message.content or ""
+            
+            # 生成器函数，逐个返回响应内容
+            async def stream_generator():
+                full_content = ""
+                for chunk in response:
+                    content = chunk.choices[0].delta.content
+                    if content:
+                        full_content += content
+                        yield content
+                logger.info(f"Model: {model}, Base URL: {base_url}\nStream response: {full_content}\n")
+                
+            return stream_generator()
             
         except Exception as e:
             # 尝试 2: 如果使用了 system_instr 且调用失败 (如 400/422 不支持 system role)，
@@ -98,16 +112,63 @@ async def chat_completion(question: str, model: str, base_url: str, api_key: str
                 
                 response = client.chat.completions.create(
                     model=model,
-                    messages=messages # type: ignore
+                    messages=messages, # type: ignore
+                    stream=True
                 )
-                return response.choices[0].message.content or ""
+                
+                # 生成器函数，逐个返回响应内容
+                async def stream_generator():
+                    full_content = ""
+                    for chunk in response:
+                        content = chunk.choices[0].delta.content
+                        if content:
+                            full_content += content
+                            yield content
+                    logger.info(f"Model: {model}, Base URL: {base_url}\nStream response: {full_content}\n")
+                    
+                return stream_generator()
             
             # 如果没有使用 system_instr 或者重试也失败，则抛出异常
             raise e
+    else:
+        # 非流式响应模式
+        def _sync_call():
+            client = OpenAI(api_key=api_key, base_url=base_url)
+            
+            # 尝试 1: 标准方式，使用 system role
+            try:
+                messages: List[Dict[str, str]] = []
+                if system_instr is not None:
+                    messages.append({"role": "system", "content": system_instr})
+                messages.append({"role": "user", "content": question})
+                
+                response = client.chat.completions.create(
+                    model=model,
+                    messages=messages # type: ignore
+                )
+                return response.choices[0].message.content or ""
+                
+            except Exception as e:
+                # 尝试 2: 如果使用了 system_instr 且调用失败 (如 400/422 不支持 system role)，
+                # 则降级为将 system instruction 拼接到 user message 中
+                if system_instr is not None:
+                    logger.warning(f"Chat completion failed with system role. Retrying by merging system instruction into user prompt. Error: {e}")
+                    
+                    merged_content = f"{system_instr}\n\n{question}"
+                    messages = [{"role": "user", "content": merged_content}]
+                    
+                    response = client.chat.completions.create(
+                        model=model,
+                        messages=messages # type: ignore
+                    )
+                    return response.choices[0].message.content or ""
+                
+                # 如果没有使用 system_instr 或者重试也失败，则抛出异常
+                raise e
 
-    content = await asyncio.get_event_loop().run_in_executor(None, _sync_call)
-    logger.info(f"Model: {model}, Base URL: {base_url}\nResponse: {content}\n")
-    return content
+        content = await asyncio.get_event_loop().run_in_executor(None, _sync_call)
+        logger.info(f"Model: {model}, Base URL: {base_url}\nResponse: {content}\n")
+        return content
 
 def init_genai_client(api_key: str | None = None) -> 'genai.Client':
     """Initialize Gemini AI client"""
@@ -182,31 +243,69 @@ def _resolve_model_entry(name: str, config_data: Dict[str, Any]) -> Optional[Dic
     return None
 
 
-def _build_config_from_yaml(name: str, config_data: Dict[str, Any]) -> Optional[Dict[str, str]]:
+def _build_config_from_yaml(name: str, config_data: Dict[str, Any]) -> List[Dict[str, str]]:
     entry = _resolve_model_entry(name, config_data)
     if not entry:
         default_key = config_data.get("default_model")
         if isinstance(default_key, str):
             entry = config_data.get("models", {}).get(default_key)
     if not entry:
-        return None
+        return []
 
-    provider_key = entry.get("provider")
+    provider_entries = entry.get("providers", [])
+    if not isinstance(provider_entries, list):
+        return []
+
     providers = config_data.get("providers", {})
-    provider = providers.get(provider_key, {}) if isinstance(providers, dict) else {}
+    if not isinstance(providers, dict):
+        return []
 
-    base_url = entry.get("base_url") or provider.get("base_url", "")
-    api_key_env = entry.get("api_key_env") or provider.get("api_key_env", "")
-    api_key = os.environ.get(api_key_env, "") if api_key_env else ""
+    configs: List[Dict[str, str]] = []
+    for provider_entry in provider_entries:
+        if not isinstance(provider_entry, dict):
+            continue
 
-    return {
-        "url": base_url,
-        "model": entry.get("model", ""),
-        "api_key": api_key,
-    }
+        provider_key = provider_entry.get("provider")
+        if not provider_key:
+            continue
 
+        provider = providers.get(provider_key, {})
+        if not isinstance(provider, dict):
+            continue
+
+        base_url = provider_entry.get("base_url") or provider.get("base_url", "")
+        api_key_env = provider_entry.get("api_key_env") or provider.get("api_key_env", "")
+        api_key = os.environ.get(api_key_env, "") if api_key_env else ""
+
+        configs.append({
+            "url": base_url,
+            "model": provider_entry.get("model", ""),
+            "api_key": api_key,
+            "provider": provider_key,
+        })
+
+    return configs
+
+
+def _is_network_or_http_error(exc: Exception) -> bool:
+    if isinstance(exc, (asyncio.TimeoutError, TimeoutError, aiohttp.ClientError, OSError)):
+        return True
+    status_code = getattr(exc, "status_code", None)
+    if isinstance(status_code, int):
+        return True
+    status = getattr(exc, "status", None)
+    if isinstance(status, int):
+        return True
+    return False
+
+import warnings
 
 def _init_ai_config_fallback(name: str) -> dict[str, str]:
+    warnings.warn(
+        "This method is deprecated, use YAML config instead", 
+        DeprecationWarning, 
+        stacklevel=2
+    )
     free_api_url = "https://lastxianyi.zeabur.app/v1"
     chat_api_url = "https://api.chatanywhere.org/v1"
 
@@ -275,7 +374,7 @@ def _init_ai_config_fallback(name: str) -> dict[str, str]:
     return config
 
 
-def init_ai_config(model: str = "default") -> dict[str, str]:
+def init_ai_config(model: str = "default") -> List[Dict[str, str]]:
     """
     Initialize configuration for different AI models based on the model name.
     Uses YAML config if available, otherwise falls back to static mapping.
@@ -283,10 +382,52 @@ def init_ai_config(model: str = "default") -> dict[str, str]:
     name = model.lower()
     config_data = load_model_config()
     if config_data:
-        yaml_config = _build_config_from_yaml(name, config_data)
-        if yaml_config:
-            return yaml_config
-    return _init_ai_config_fallback(name)
+        yaml_configs = _build_config_from_yaml(name, config_data)
+        if yaml_configs:
+            return yaml_configs
+    else:
+        return [_init_ai_config_fallback(name)]
+
+
+async def chat_completion(
+    question: str,
+    model_name: str,
+    system_instr: str | None = None,
+    configs: Optional[List[Dict[str, str]]] = None,
+    streaming: bool = False,
+) -> Union[str, Any]:
+    configs = configs or init_ai_config(model_name)
+    last_error: Optional[Exception] = None
+
+    for config in configs:
+        api_key = config.get("api_key", "")
+        if not api_key:
+            continue
+
+        try:
+            return await _chat_completion(
+                question=question,
+                model=config.get("model", ""),
+                base_url=config.get("url", ""),
+                api_key=api_key,
+                system_instr=system_instr,
+                streaming=streaming
+            )
+        except Exception as exc:  # noqa: BLE001
+            last_error = exc
+            if _is_network_or_http_error(exc):
+                logger.warning(
+                    "Provider failed, trying next. provider=%s model=%s error=%s",
+                    config.get("provider", ""),
+                    config.get("model", ""),
+                    exc,
+                )
+                continue
+            raise
+
+    if last_error:
+        raise last_error
+    raise RuntimeError("No available provider configuration found.")
 
 
 def get_ai_models() -> list:
@@ -884,24 +1025,3 @@ load_secrets_from_env()
 # # 全局AI Infra实例
 # ai_infra = AIInfra()
 
-
-# 导出主要类和实例
-__all__ = [
-    # 'AIInfra',
-    # 'BaseModel',
-    # 'OpenAIModel',
-    # 'AnthropicModel',
-    # 'RedisCache',
-    # 'PerformanceMonitor',
-    # 'CircuitBreaker',
-    # 'ModelConfig',
-    # 'ModelResponse',
-    # 'ModelProvider',
-    # 'ai_infra',
-    'chat_completion',
-    'init_genai_client',
-    'interact_with_pdf',
-    'init_ai_config',
-    'get_ai_models',
-    'load_secrets_from_env'
-]

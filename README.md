@@ -19,18 +19,17 @@ pip install -r requirements.txt
 ## 使用
 
 ```python
-from ai_infra import init_ai_config, chat_completion
+from ai_infra import init_ai_config, chat_completion_with_failover
 
-# 初始化配置
-config = init_ai_config("gpt-4")
-print(config)
+# 初始化配置（返回按优先顺序的 provider 列表）
+configs = init_ai_config("qwen-max")
+print(configs)
 
-# 进行聊天完成
-response = await chat_completion(
+# 进行聊天完成（失败自动切换到下一个 provider）
+response = await chat_completion_with_failover(
     question="Hello, world!",
-    model=config["model"],
-    base_url=config["url"],
-    api_key=config["api_key"]
+    model_name="qwen-max",
+	configs=configs
 )
 ```
 
