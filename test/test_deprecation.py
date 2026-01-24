@@ -6,7 +6,7 @@ import warnings
 import shutil
 import pytest
 from ai_infra import init_ai_config
-from ai_infra.ai_infra import _init_ai_config_fallback
+from ai_infra import _init_ai_config_fallback
 
 
 def test_deprecation_warning():

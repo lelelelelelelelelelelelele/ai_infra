@@ -93,7 +93,15 @@ async def _chat_completion(question: str, model: str, base_url: str, api_key: st
             async def stream_generator():
                 full_content = ""
                 for chunk in response:
-                    content = chunk.choices[0].delta.content
+                    choices = getattr(chunk, "choices", None)
+                    if not choices:
+                        continue
+                    choice0 = choices[0]
+                    delta = getattr(choice0, "delta", None)
+                    if isinstance(delta, dict):
+                        content = delta.get("content")
+                    else:
+                        content = getattr(delta, "content", None) if delta is not None else None
                     if content:
                         full_content += content
                         yield content
@@ -120,7 +128,15 @@ async def _chat_completion(question: str, model: str, base_url: str, api_key: st
                 async def stream_generator():
                     full_content = ""
                     for chunk in response:
-                        content = chunk.choices[0].delta.content
+                        choices = getattr(chunk, "choices", None)
+                        if not choices:
+                            continue
+                        choice0 = choices[0]
+                        delta = getattr(choice0, "delta", None)
+                        if isinstance(delta, dict):
+                            content = delta.get("content")
+                        else:
+                            content = getattr(delta, "content", None) if delta is not None else None
                         if content:
                             full_content += content
                             yield content
@@ -213,7 +229,7 @@ def interact_with_pdf(client: 'genai.Client', file: Union[str, os.PathLike[str],
     return content
 
 MODEL_CONFIG_PATH = os.path.normpath(
-    os.path.join(os.path.dirname(__file__), "..", "config", "ai_models.yaml")
+    os.path.join(os.path.dirname(__file__), "..", "ai_infra", "ai_models.yaml")
 )
 
 
@@ -391,11 +407,14 @@ def init_ai_config(model: str = "default") -> List[Dict[str, str]]:
 
 async def chat_completion(
     question: str,
-    model_name: str,
+    model_name: str = "",
     system_instr: str | None = None,
     configs: Optional[List[Dict[str, str]]] = None,
     streaming: bool = False,
 ) -> Union[str, Any]:
+    if model_name == "" and configs is None:
+        raise ValueError("Either model_name or configs must be provided.")
+
     configs = configs or init_ai_config(model_name)
     last_error: Optional[Exception] = None
 
@@ -450,7 +469,7 @@ def load_secrets_from_env(env_file: str = "secret.env"):
         logger.warning(f"Could not load secrets from {env_file}. dotenv not available or file not found.")
 
 # 初始化时加载环境变量
-load_secrets_from_env()
+load_secrets_from_env(".env")
 
 
 # class ModelProvider(Enum):

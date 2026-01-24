@@ -1,47 +1,44 @@
-"""
-流式响应功能示例
-"""
+"""Pytest example for chat completion."""
 import asyncio
+
+import pytest
+
 from ai_infra import chat_completion, init_ai_config
 
-async def streaming_example():
-    """流式响应示例"""
-    print("流式响应示例:")
-    
-    # 初始化配置
-    config = init_ai_config("gpt")
-    
-    # 使用流式响应
-    print("正在获取流式响应...")
-    async for chunk in chat_completion(
-        question="请简要介绍AI基础设施的重要性，分三个要点说明。",
-        model=config[0]["model"] if isinstance(config, list) and config else config.get("model", "gpt-3.5-turbo"),
-        base_url=config[0]["url"] if isinstance(config, list) and config else config.get("url", ""),
-        api_key=config[0]["api_key"] if isinstance(config, list) and config else config.get("api_key", ""),
-        streaming=True
-    ):
-        print(chunk, end="", flush=True)
-    
-    print("\n流式响应完成!")
 
-async def non_streaming_example():
-    """非流式响应示例（对比）"""
-    print("\n非流式响应示例:")
-    
-    # 初始化配置
-    config = init_ai_config("gpt")
-    
-    # 使用非流式响应
-    response = await chat_completion(
-        question="请简要介绍AI基础设施的重要性，分三个要点说明。",
-        model=config[0]["model"] if isinstance(config, list) and config else config.get("model", "gpt-3.5-turbo"),
-        base_url=config[0]["url"] if isinstance(config, list) and config else config.get("url", ""),
-        api_key=config[0]["api_key"] if isinstance(config, list) and config else config.get("api_key", ""),
-        streaming=False
+def test_chat_completion_gpt():
+    configs = init_ai_config("gpt")
+    print("Loaded configs:", configs)
+    if not any(config.get("api_key") for config in configs):
+        pytest.skip("Missing API key for GPT provider")
+
+    response = asyncio.run(
+        chat_completion(
+            question="请简要介绍AI基础设施的重要性，分三个要点说明。",
+            model_name="gpt",
+        )
     )
-    
-    print(f"完整响应: {response}")
 
-if __name__ == "__main__":
-    asyncio.run(streaming_example())
-    asyncio.run(non_streaming_example())
+    assert isinstance(response, str)
+    assert response.strip()
+
+
+def test_chat_completion_gpt_streaming():
+    configs = init_ai_config("gpt")
+    print("Loaded configs:", configs)
+    if not any(config.get("api_key") for config in configs):
+        pytest.skip("Missing API key for GPT provider")
+
+    async def _run_stream() -> str:
+        chunks = []
+        async for chunk in await chat_completion(
+            question="请简要介绍AI基础设施的重要性，分三个要点说明。",
+            model_name="gpt",
+            streaming=True,
+        ):
+            chunks.append(chunk)
+        return "".join(chunks)
+
+    response = asyncio.run(_run_stream())
+    assert isinstance(response, str)
+    assert response.strip()
