@@ -48,10 +48,40 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 # ================================
+# AI 响应分装类 (AI Response Wrappers)
+# ================================
+
+class AIResponse(str):
+    """
+    包装后的字符串响应，支持直接作为字符串使用，
+    同时也携带 model, success 等元数据。
+    """
+    def __new__(cls, content, model, success=True, provider=None):
+        obj = str.__new__(cls, content)
+        obj.model = model
+        obj.success = success
+        obj.provider = provider
+        return obj
+
+class AIStream:
+    """
+    包装后的流式响应，代理异步生成器，
+    同时也携带 model, success 等元数据。
+    """
+    def __init__(self, generator, model, success=True, provider=None):
+        self._generator = generator
+        self.model = model
+        self.success = success
+        self.provider = provider
+
+    def __aiter__(self):
+        return self._generator.__aiter__()
+
+# ================================
 # 融合的用户提供的AI功能函数
 # ================================
 
-async def _chat_completion(question: str, model: str, base_url: str, api_key: str, system_instr: str | None = None, streaming: bool = False):
+async def _chat_completion(question: str, model: str, base_url: str, api_key: str, system_instr: str | None = None, streaming: bool = False, provider: str | None = None):
     '''
     AI interaction function using OpenAI SDK.
     Parameters
@@ -68,6 +98,8 @@ async def _chat_completion(question: str, model: str, base_url: str, api_key: st
         System instruction for the AI model, by default None.
     streaming : bool, optional
         Whether to return streaming response, by default False.
+    provider : str, optional
+        The provider name for metadata.
     '''
     if not OPENAI_AVAILABLE:
         raise ImportError("OpenAI SDK not available. Install with: pip install openai")
@@ -106,12 +138,12 @@ async def _chat_completion(question: str, model: str, base_url: str, api_key: st
                         full_content += content
                         yield content
                 logger.info(f"Model: {model}, Base URL: {base_url}\nStream response: {full_content}\n")
-                
-            return stream_generator()
+            
+            # 返回包装后的流对象
+            return AIStream(stream_generator(), model=model, provider=provider)
             
         except Exception as e:
-            # 尝试 2: 如果使用了 system_instr 且调用失败 (如 400/422 不支持 system role)，
-            # 则降级为将 system instruction 拼接到 user message 中
+            # 尝试 2: 降级逻辑
             if system_instr is not None:
                 logger.warning(f"Chat completion failed with system role. Retrying by merging system instruction into user prompt. Error: {e}")
                 
@@ -124,7 +156,6 @@ async def _chat_completion(question: str, model: str, base_url: str, api_key: st
                     stream=True
                 )
                 
-                # 生成器函数，逐个返回响应内容
                 async def stream_generator():
                     full_content = ""
                     for chunk in response:
@@ -141,17 +172,15 @@ async def _chat_completion(question: str, model: str, base_url: str, api_key: st
                             full_content += content
                             yield content
                     logger.info(f"Model: {model}, Base URL: {base_url}\nStream response: {full_content}\n")
-                    
-                return stream_generator()
+                
+                return AIStream(stream_generator(), model=model, provider=provider)
             
-            # 如果没有使用 system_instr 或者重试也失败，则抛出异常
             raise e
     else:
         # 非流式响应模式
         def _sync_call():
             client = OpenAI(api_key=api_key, base_url=base_url)
             
-            # 尝试 1: 标准方式，使用 system role
             try:
                 messages: List[Dict[str, str]] = []
                 if system_instr is not None:
@@ -165,26 +194,21 @@ async def _chat_completion(question: str, model: str, base_url: str, api_key: st
                 return response.choices[0].message.content or ""
                 
             except Exception as e:
-                # 尝试 2: 如果使用了 system_instr 且调用失败 (如 400/422 不支持 system role)，
-                # 则降级为将 system instruction 拼接到 user message 中
                 if system_instr is not None:
-                    logger.warning(f"Chat completion failed with system role. Retrying by merging system instruction into user prompt. Error: {e}")
-                    
+                    logger.warning(f"Chat completion failed with system role. Retrying... Error: {e}")
                     merged_content = f"{system_instr}\n\n{question}"
                     messages = [{"role": "user", "content": merged_content}]
-                    
                     response = client.chat.completions.create(
                         model=model,
                         messages=messages # type: ignore
                     )
                     return response.choices[0].message.content or ""
-                
-                # 如果没有使用 system_instr 或者重试也失败，则抛出异常
                 raise e
 
         content = await asyncio.get_event_loop().run_in_executor(None, _sync_call)
         logger.info(f"Model: {model}, Base URL: {base_url}\nResponse: {content}\n")
-        return content
+        # 返回包装后的字符串对象
+        return AIResponse(content, model=model, provider=provider)
 
 def init_genai_client(api_key: str | None = None) -> 'genai.Client':
     """Initialize Gemini AI client"""
@@ -430,7 +454,8 @@ async def chat_completion(
                 base_url=config.get("url", ""),
                 api_key=api_key,
                 system_instr=system_instr,
-                streaming=streaming
+                streaming=streaming,
+                provider=config.get("provider")
             )
         except Exception as exc:  # noqa: BLE001
             last_error = exc
