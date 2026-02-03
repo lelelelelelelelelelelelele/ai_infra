@@ -2,7 +2,7 @@ import os
 import pathlib
 import yaml
 
-import ai_infra as ai_infra_module
+from ai_infra.ai_infra import _build_config_from_yaml
 
 
 def test_main() -> None:
@@ -15,7 +15,7 @@ def test_main() -> None:
     os.environ["DASHSCOPE_KEY"] = "dummy_dashscope_key"
     os.environ["IFLOW_KEY"] = "dummy_iflow_key"
 
-    configs = ai_infra_module._build_config_from_yaml("qwen-max", config_data)
+    configs = _build_config_from_yaml("qwen-max", config_data)
     print(configs)
     assert configs, "No configs returned for qwen-max"
     assert configs[0]["model"] == "qwen-max"
