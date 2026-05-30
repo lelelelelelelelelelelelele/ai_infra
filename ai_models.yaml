@@ -3,7 +3,9 @@ default_model: gpt
 providers:
   FREE:
     api_key_env: FREE_KEY
-    base_url: https://lastxianyi.zeabur.app/v1
+    # Relay swapped 2026-05-31: lastxianyi.zeabur.app returned 502, moved to
+    # wherexianyi.zeabur.app (verified live, OpenAI /v1/chat/completions format).
+    base_url: https://wherexianyi.zeabur.app/v1
   CHAT:
     api_key_env: CHAT_KEY
     base_url: https://api.chatanywhere.org/v1
@@ -20,53 +22,48 @@ providers:
     api_key_env: IFLOW_KEY
     base_url: https://apis.iflow.cn/v1
 
+# Resolution (see _resolve_model_entry): exact key wins first; otherwise the
+# first entry whose `match` substring appears in the requested name, in the
+# insertion order below — so keep specific keys (qwen-coder) above broad ones
+# (qwen, spark's "st").
+#
+# FREE relay (wherexianyi) probed 2026-05-31. Kept = fast + reliable:
+#   mistral ~3s · qwen ~4s · qwen-coder ~6s · deepseek-flash ~5-25s · deepseek ~14s
+# Dropped from FREE (dead or ~105s+ on this relay): gpt-oss-120b,
+# moonshotai/Kimi-K2-Instruct, zai-org/GLM-4.5, tongyi-qwen3-max-model.
 models:
-  gpt-oss:
+  # --- FREE relay (wherexianyi) ---
+  mistral:
     providers:
       - provider: FREE
-        model: openai/gpt-oss-120b
-    match: ["default", "gpt-oss"]
+        model: mistralai/mistral-medium-3.5-128b
+    match: ["mistral"]
 
-  qwen-flash:
-    providers:
-      - provider: DASHSCOPE
-        model: qwen-flash
-
-  spark:
-    providers:
-      - provider: ST
-        model: lite
-    match: ["st", "spark"]
-
-  gemini:
-    providers:
-      - provider: GEMINI
-        model: gemini-2.5-flash
-    match: ["gemini", "google"]
-
-  kimi:
+  qwen-coder:
     providers:
       - provider: FREE
-        model: moonshotai/Kimi-K2-Instruct
-    match: ["kimi", "moonshot"]
+        model: qwen/qwen3-coder-480b-a35b-instruct
+    match: ["qwen-coder", "coder"]
 
-  qwen-max:
+  qwen:
     providers:
-      - provider: DASHSCOPE
-        model: qwen-max
-      - provider: IFLOW
-        model: qwen3-max
       - provider: FREE
-        model: tongyi-qwen3-max-model
+        model: qwen/qwen3.5-397b-a17b
     match: ["qwen"]
-    match: ["qwen", "qwen-max", "qwen3-max"]
 
-  glm:
+  deepseek-flash:
     providers:
       - provider: FREE
-        model: zai-org/GLM-4.5
-    match: ["glm"]
+        model: deepseek-ai/deepseek-v4-flash
+    match: ["deepseek-flash"]
 
+  deepseek:
+    providers:
+      - provider: FREE
+        model: deepseek-ai/deepseek-v4-pro
+    match: ["deepseek", "ds"]
+
+  # --- other providers ---
   gpt:
     providers:
       - provider: CHAT
@@ -79,8 +76,30 @@ models:
         model: gpt-4o-mini
     match: ["gpt-4o-mini"]
 
-  deepseek:
+  gemini:
     providers:
-      - provider: CHAT
-        model: deepseek-v3
-    match: ["deepseek", "ds"]
+      - provider: GEMINI
+        model: gemini-2.5-flash
+    match: ["gemini", "google"]
+
+  spark:
+    providers:
+      - provider: ST
+        model: lite
+    match: ["st", "spark"]
+
+  # Alibaba DashScope / iFlow (need DASHSCOPE_KEY / IFLOW_KEY; not on the relay)
+  qwen-flash:
+    providers:
+      - provider: DASHSCOPE
+        model: qwen-flash
+    match: ["qwen-flash"]
+
+  qwen-max:
+    providers:
+      - provider: DASHSCOPE
+        model: qwen-max
+      - provider: IFLOW
+        model: qwen3-max
+    # only the exact key "qwen-max" routes here; bare "qwen*" hits the FREE qwen entry above
+    match: ["qwen-max"]

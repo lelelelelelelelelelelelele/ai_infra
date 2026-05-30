@@ -346,15 +346,15 @@ def _init_ai_config_fallback(name: str) -> dict[str, str]:
         DeprecationWarning, 
         stacklevel=2
     )
-    free_api_url = "https://lastxianyi.zeabur.app/v1"
+    free_api_url = "https://wherexianyi.zeabur.app/v1"  # was lastxianyi (502)
     chat_api_url = "https://api.chatanywhere.org/v1"
 
     if "default" in name or name == "gpt-oss":
         config = {
-            "url": free_api_url,
-            "model": "openai/gpt-oss-120b",
+            "url": chat_api_url,
+            "model": "gpt-5-mini",
         }
-        api_model = "FREE"
+        api_model = "CHAT"
     elif "st" in name or "spark" in name:
         config = {
             "url": "https://spark-api-open.xf-yun.com/v1",
@@ -376,7 +376,7 @@ def _init_ai_config_fallback(name: str) -> dict[str, str]:
     elif "qwen" in name:
         config = {
             "url": free_api_url,
-            "model": "tongyi-qwen3-max-model",
+            "model": "qwen/qwen3.5-397b-a17b",
         }
         api_model = "FREE"
     elif "glm" in name:
@@ -399,10 +399,10 @@ def _init_ai_config_fallback(name: str) -> dict[str, str]:
         api_model = "CHAT"
     elif "deepseek" in name or "ds" in name:
         config = {
-            "url": chat_api_url,
-            "model": "deepseek-v3",
+            "url": free_api_url,
+            "model": "deepseek-ai/deepseek-v4-pro",
         }
-        api_model = "CHAT"
+        api_model = "FREE"
     else:
         config = {
             "url": chat_api_url,
