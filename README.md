@@ -76,13 +76,13 @@ print(f"\nFinal Provider: {stream.provider}")
 
 ```yaml
 models:
-  qwen-max:
+  deepseek:
     providers:
-      - provider: DASHSCOPE
-        model: qwen-max                # 首选 DashScope
-      - provider: FREE
-        model: qwen/qwen3.5-397b-a17b  # 备选：中转站兜底（示例）
-    match: ["qwen-max"]
+      - provider: FREE                    # 首选：免费中转站
+        model: deepseek-ai/deepseek-v4-pro
+      - provider: DASHSCOPE               # 兜底：付费 DashScope，仅在中转站失败时
+        model: deepseek-v4-pro
+    match: ["deepseek", "ds"]
 ```
 
 ## 环境依赖 (Dependencies)

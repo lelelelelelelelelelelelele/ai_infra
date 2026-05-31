@@ -28,6 +28,10 @@ providers:
 #   mistral ~3s · qwen ~4s · qwen-coder ~6s · deepseek-flash ~5-25s · deepseek ~14s
 # Dropped from FREE (dead or ~105s+ on this relay): gpt-oss-120b,
 # moonshotai/Kimi-K2-Instruct, zai-org/GLM-4.5, tongyi-qwen3-max-model.
+#
+# DASHSCOPE (paid) is the 2nd provider on deepseek/deepseek-flash/qwen/
+# qwen-coder: free relay first, paid Alibaba only as failover (all 4 verified
+# 2026-05-31). qwen-flash/qwen-max remain DashScope-only premium aliases.
 models:
   # --- FREE relay (wherexianyi) ---
   mistral:
@@ -40,24 +44,32 @@ models:
     providers:
       - provider: FREE
         model: qwen/qwen3-coder-480b-a35b-instruct
+      - provider: DASHSCOPE
+        model: qwen3-coder-480b-a35b-instruct
     match: ["qwen-coder", "coder"]
 
   qwen:
     providers:
       - provider: FREE
         model: qwen/qwen3.5-397b-a17b
+      - provider: DASHSCOPE
+        model: qwen3.5-397b-a17b
     match: ["qwen"]
 
   deepseek-flash:
     providers:
       - provider: FREE
         model: deepseek-ai/deepseek-v4-flash
+      - provider: DASHSCOPE
+        model: deepseek-v4-flash
     match: ["deepseek-flash"]
 
   deepseek:
     providers:
       - provider: FREE
         model: deepseek-ai/deepseek-v4-pro
+      - provider: DASHSCOPE
+        model: deepseek-v4-pro
     match: ["deepseek", "ds"]
 
   # --- other providers ---
@@ -76,7 +88,7 @@ models:
   gemini:
     providers:
       - provider: GEMINI
-        model: gemini-2.5-flash
+        model: gemini-flash-latest
     match: ["gemini", "google"]
 
   spark:
