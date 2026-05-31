@@ -79,9 +79,9 @@ models:
   qwen-max:
     providers:
       - provider: DASHSCOPE
-        model: qwen-max        # 首选 DashScope
-      - provider: IFLOW
-        model: qwen3-max       # 备选 iFlow
+        model: qwen-max                # 首选 DashScope
+      - provider: FREE
+        model: qwen/qwen3.5-397b-a17b  # 备选：中转站兜底（示例）
     match: ["qwen-max"]
 ```
 

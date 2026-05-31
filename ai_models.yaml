@@ -18,9 +18,6 @@ providers:
   DASHSCOPE:
     api_key_env: DASHSCOPE_KEY
     base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
-  IFLOW:
-    api_key_env: IFLOW_KEY
-    base_url: https://apis.iflow.cn/v1
 
 # Resolution (see _resolve_model_entry): exact key wins first; otherwise the
 # first entry whose `match` substring appears in the requested name, in the
@@ -88,7 +85,7 @@ models:
         model: lite
     match: ["st", "spark"]
 
-  # Alibaba DashScope / iFlow (need DASHSCOPE_KEY / IFLOW_KEY; not on the relay)
+  # Alibaba DashScope (needs DASHSCOPE_KEY; not on the relay)
   qwen-flash:
     providers:
       - provider: DASHSCOPE
@@ -99,7 +96,5 @@ models:
     providers:
       - provider: DASHSCOPE
         model: qwen-max
-      - provider: IFLOW
-        model: qwen3-max
     # only the exact key "qwen-max" routes here; bare "qwen*" hits the FREE qwen entry above
     match: ["qwen-max"]
