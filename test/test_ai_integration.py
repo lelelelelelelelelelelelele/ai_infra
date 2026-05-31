@@ -6,7 +6,6 @@ These tests focus on config loading and basic wiring. Network calls are skipped 
 import pytest
 
 from ai_infra.ai_infra import (
-	ai_infra,
 	chat_completion,
 	get_ai_models,
 	init_ai_config,
@@ -43,9 +42,3 @@ async def test_chat_completion_smoke():
 		configs=configs,
 	)
 	assert str(response).strip() == "OK"
-
-
-def test_ai_infra_instance_smoke():
-	# Legacy compatibility: global AIInfra instance exists.
-	assert ai_infra is not None
-	assert hasattr(ai_infra, "models")
