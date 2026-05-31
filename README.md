@@ -75,15 +75,19 @@ print(f"\nFinal Provider: {stream.provider}")
 模型解析规则：先精确匹配 key，否则按声明顺序取第一个 `match` 子串命中的条目；Failover 由一个模型下 `providers` 的顺序决定：
 
 ```yaml
+# 故障转移示例（说明用法）：一个模型可配多个 provider，按顺序尝试，
+# 前一个网络/HTTP 出错才切下一个。
 models:
-  deepseek:
+  some-model:
     providers:
-      - provider: FREE                    # 首选：免费中转站
-        model: deepseek-ai/deepseek-v4-pro
-      - provider: DASHSCOPE               # 兜底：付费 DashScope，仅在中转站失败时
-        model: deepseek-v4-pro
-    match: ["deepseek", "ds"]
+      - provider: FREE      # 首选
+        model: <free-model-id>
+      - provider: CHAT      # 备选
+        model: <fallback-model-id>
 ```
+
+> 注：当前实际配置里所有模型都是单 provider。付费的 DASHSCOPE 不做自动兜底，
+> 只能通过 `qwen-flash` / `qwen-max` 这两个别名显式调用。
 
 ## 环境依赖 (Dependencies)
 
