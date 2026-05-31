@@ -18,6 +18,12 @@ providers:
   DASHSCOPE:
     api_key_env: DASHSCOPE_KEY
     base_url: https://dashscope.aliyuncs.com/compatible-mode/v1
+  MOTA:                                    # 魔搭 ModelScope，免费 API-Inference（有日额度）
+    api_key_env: MOTA_KEY
+    base_url: https://api-inference.modelscope.cn/v1
+  XIAOMI:                                  # 小米 MiMo Token Plan（订阅制，CN 专属端点）
+    api_key_env: MIMO_KEY
+    base_url: https://token-plan-cn.xiaomimimo.com/v1
 
 # Resolution (see _resolve_model_entry): exact key wins first; otherwise the
 # first entry whose `match` substring appears in the requested name, in the
@@ -97,3 +103,29 @@ models:
         model: qwen-max
     # only the exact key "qwen-max" routes here; bare "qwen*" hits the FREE qwen entry above
     match: ["qwen-max"]
+
+  # --- Xiaomi MiMo (Token Plan CN, 订阅制；推理型，中文/代码都不错) ---
+  mimo:
+    providers:
+      - provider: XIAOMI
+        model: mimo-v2.5-pro
+    match: ["mimo"]
+
+  # --- ModelScope 魔搭 (free, 有日额度；显式 mota-* 调用，不做自动兜底) ---
+  mota-qwen:
+    providers:
+      - provider: MOTA
+        model: Qwen/Qwen3.5-397B-A17B
+    match: ["mota-qwen"]
+
+  mota-deepseek:
+    providers:
+      - provider: MOTA
+        model: deepseek-ai/DeepSeek-V4-Pro
+    match: ["mota-deepseek"]
+
+  mota-coder:
+    providers:
+      - provider: MOTA
+        model: Qwen/Qwen3-Coder-30B-A3B-Instruct
+    match: ["mota-coder"]
